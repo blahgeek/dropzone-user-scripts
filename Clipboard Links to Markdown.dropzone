@@ -56,8 +56,7 @@ def clicked(was_dragged = false)
       o += "[#{x['title']}]: #{x['link']}\n"
     }
     $dz.finish("#{output.length} links found")
-	%x{echo "#{o}"|pbcopy}
-    $dz.url(false)
+    $dz.text("#{o}")
   end
 end
 
