@@ -1,0 +1,125 @@
+#!/usr/bin/ruby
+ 
+# Dropzone Destination Info
+# Name: Pushbullet
+# Description: Push file to your Android phone. Copy your API Key from Pushbullet account settings.
+# Handles: NSFilenamesPboardType
+# Events: Clicked, Dragged
+# Creator: BlahGeek
+# URL: http://blog.blahgeek.com/dropzone-pushbullet
+# IconURL: https://lh3.ggpht.com/hlxRPX7B5J28cgGAZcovaT-7wLimLi0wPi7dSI6udH5NGI58WTBezGgpJyIepZhBRp4=w300
+# OptionsNIB: Login
+# LoginTitle: API Key / Device ID (Optional, just leave 'x' there)
+
+require 'rubygems'
+ 
+def handle_errors(line)
+  if line[0..4] == "curl:"
+    if line[6..-1] =~ /Couldn't resolve/
+      $dz.error("Upload Error", "Please check your network connection.")
+    else
+      $dz.error("Upload Error", line[6..-1])
+    end
+  end
+end
+
+
+def curl_it(cmd)
+
+  begin
+    require 'json'
+  rescue LoadError
+    $dz.finish('Gem json not installed.')
+    $dz.url(false)
+    Process.exit
+  end
+
+  command = "/usr/bin/curl '-#' -u #{ENV['USERNAME']}: "
+  command << cmd
+  command << " 2>&1 | tr -u \"\r\" \"\n\""
+
+  last_output = 0
+  is_receiving_json = false
+  json_output = ""
+
+  IO.popen(command) do |f|
+    while line = f.gets
+      if line =~ /%/ and not is_receiving_json
+        line_split = line.split(" ")
+        file_percent_raw = line_split[1]
+        if file_percent_raw != nil
+          file_percent = file_percent_raw.to_i
+          if last_output != file_percent
+            $dz.percent(file_percent) 
+            $dz.determinate(false) if file_percent == 100
+          end
+          last_output = file_percent
+        end
+      else
+        if line =~ /\{/ or is_receiving_json
+          is_receiving_json = true
+          json_output << line
+        else
+          handle_errors(line)
+        end
+      end
+    end
+  end
+
+  ret = JSON.parse(json_output)
+  if ret.has_key?("error")
+    $dz.finish('Error: ' + ret["error"]["message"])
+    $dz.url(false)
+    Process.exit
+  end
+  return ret
+
+end
+
+
+def select_device
+  $dz.determinate(false)
+  $dz.begin("Getting device list...")
+
+  ret = curl_it('https://api.pushbullet.com/api/devices')
+  items = '--items'
+  ret['devices'].each do |device|
+    items << " \"#{device['extras']['model']}:#{device['iden']}\" "
+  end
+  title = 'Pushbullet'
+  text = 'Select target device:'
+  dialog_output = `./CocoaDialog standard-dropdown --title #{title} --text #{text} #{items} --string-output`
+  button, text = dialog_output.split("\n")
+  if text.nil? or button == 'Cancel'
+    $dz.finish('Cancelled')
+    $dz.url(false)
+    Process.exit
+  end
+  text.split(':')[-1]
+end
+
+
+def dragged
+
+  if ENV['PASSWORD'] == 'x'
+    device_iden = select_device
+  else
+    device_iden = ENV['PASSWORD']
+  end
+
+  $dz.determinate(true)
+  file_path = $items[0]
+  filename = File.basename(file_path)
+  file_path = file_path.gsub('"', '\"')
+  $dz.begin("Uploading #{filename}...")
+
+  ret = curl_it("-F 'device_iden=#{device_iden}' -F type=file -F \"file=@#{file_path}\" https://api.pushbullet.com/api/pushes")
+
+  $dz.finish('Done. URL Copied.')
+  $dz.url(ret["file_url"])
+end
+
+def clicked
+  $dz.finish("Device ID Copied")
+  $dz.text(select_device)
+end

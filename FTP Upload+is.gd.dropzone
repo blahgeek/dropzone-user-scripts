@@ -8,7 +8,7 @@
 # KeyModifiers: Option
 # Creator: BlahGeek
 # URL: http://blog.blahgeek.com
-# IconURL: http://aptonic.com/destinations/icons/network.png
+# IconURL: http://a3.mzstatic.com/us/r30/Purple4/v4/ba/3f/b1/ba3fb11d-ccb7-6555-292a-e02fc0c8f9d0/icon_256.png
 # OptionsNIB: ExtendedLogin
 
 $host_info = {:server    => ENV['SERVER'],

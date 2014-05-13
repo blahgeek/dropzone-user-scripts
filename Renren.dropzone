@@ -25,7 +25,7 @@ def get_token
   rescue LoadError
     $dz.finish('Gem rack-oauth2 not installed.')
     $dz.url(false)
-    return
+    Process.exit
   end
 
   Rack::OAuth2::AccessToken::MAC.new(
